@@ -1,0 +1,197 @@
+---
+title: "Assignment 1 sok1005"
+format: html
+editor: visual
+---
+
+## Assignment
+
+Download the four data series from: **https://www.drroyspencer.com/latest-global-temperatures/**
+Use only the Global temperature from each dataset (i.e., the third data column).
+
+calculate the 12-month(right-aligned) moving average
+calculate a new variable called **Average**, which is the average of the four 12-month moving averages.
+Make a plot of the four-atmosphere locations and their **Average** in the same plot.
+
+use data from January 1980 and onwards. 
+
+## Code
+
+Setup
+
+```{r}
+rm(list = ls())
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(zoo))
+
+
+# A custome theme I use
+
+hod_theme_colours <- c("#ffa822","#1ac0c6","#ff6150","#30B66A","#B06AFF","#FF21E1")
+
+hod_theme <- function(alter_x_axis_colour = FALSE,
+                      ledgend_pos = "right") {
+  
+  colour_text <- "#b8aba7"
+  colour_text_light <- "#FFE9E3"
+  colour_box <- "#2b2b2b"
+  colour_lines <- "#827974"
+  colour_main <- "#E9D5DA"
+  colour_background <- "#2b2b2b"
+  colour_palette_standard <- c("#ffa822", "#ff6150","#1ac0c6")
+  colour_text_x_axis <- colour_text
+  
+  if(alter_x_axis_colour){
+     colour_text_x_axis <- c(colour_text,colour_text_light)
+  }
+    
+  theme(
+    # Border and margin
+    plot.margin = margin(0.4, 0.6, 0.4, 0.4, "cm"),
+    panel.border = element_rect(colour = colour_box, fill = NA, linetype = 2),
+    
+    # background
+    panel.background = element_rect(fill = colour_background),
+    plot.background = element_rect(fill = colour_background),
+    strip.background = element_rect(fill = colour_background),
+    
+    rect = element_rect(fill = colour_background, colour = "white",
+                        size = 0.5, linetype = 1),
+    
+    # grid
+    panel.grid.major.x = element_line(colour = colour_lines, linetype = 5, size = 0.25),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y =  element_line(colour = colour_lines, linetype = 5, size = 0.25),
+    panel.grid.minor.y = element_blank(),
+    axis.ticks = element_line(colour = colour_text),
+    
+    # line
+    line = element_line(colour = colour_palette_standard),
+    
+    # text
+    text = element_text(colour = colour_text, face = "italic", family = "mono"),
+    plot.title = element_text(colour = colour_text_light, face = "bold", family = "mono"),
+    plot.subtitle = element_text(colour = colour_text, family = "mono", hjust = 0.01),
+    plot.caption = element_text(colour = colour_text, face = "italic", family = "mono"),
+    axis.text.y = element_text(colour = colour_text, face = "italic", family = "mono"),
+    axis.text.x = element_text(colour = colour_text_x_axis, face = "italic", family = "mono"),
+    axis.title = element_text(colour = colour_text_light, family = "mono"),
+    plot.tag = element_text(colour = colour_text, face = "italic", family = "mono"),
+    legend.text = element_text(color = colour_text,face = "italic", family = "mono"),
+    legend.title = element_text(colour = colour_text, face = "italic", family = "mono"),
+    strip.text = element_text(colour = colour_text_light, face = "bold", family = "mono"),
+    
+    # legend
+    legend.position = ledgend_pos,
+    legend.key = element_rect(fill = colour_background)
+  )
+}
+
+```
+
+Importing of data
+
+```{r echo = FALSE, message=FALSE, warning=FALSE}
+df_Lower_Troposphere_raw <- read_table("https://www.nsstc.uah.edu/data/msu/v6.0/tlt/uahncdc_lt_6.0.txt")
+df_Mid_Troposphere_raw <- read_table("https://www.nsstc.uah.edu/data/msu/v6.0/tmt/uahncdc_mt_6.0.txt")
+df_Tropopause_raw <- read_table("https://www.nsstc.uah.edu/data/msu/v6.0/ttp/uahncdc_tp_6.0.txt")
+df_Lower_Stratosphere_raw <- read_table("https://www.nsstc.uah.edu/data/msu/v6.0/tls/uahncdc_ls_6.0.txt")
+```
+
+Clean Data
+
+```{r}
+clean_data <- function(df,mo_range = c(12:12),year_range = c(1980:2023),new_globe_name = "Globe"){
+  return(df %>% 
+    filter(Year %in% year_range,
+           Mo %in% mo_range) %>%
+    select(Year, Mo, Globe) %>%
+    mutate_all(as.numeric) %>% as_tibble() %>%
+    rename(!!new_globe_name := Globe)
+    )
+  }
+
+df_Lower_Troposphere <- clean_data(df_Lower_Troposphere_raw,
+                                   new_globe_name = "Globe_Temp_Lower_Trop")
+df_Mid_Troposphere <- clean_data(df_Mid_Troposphere_raw,
+                                   new_globe_name = "Globe_Temp_Mid_Trop")
+df_Tropopause <- clean_data(df_Tropopause_raw,
+                                   new_globe_name = "Globe_Temp_Tropopause")
+df_Lower_Stratosphere <- clean_data(df_Lower_Stratosphere_raw,
+                                   new_globe_name = "Globe_Temp_Lower_Strato")
+
+#combinding the 4 df to one
+df_list <- list(df_Lower_Troposphere, 
+            df_Mid_Troposphere[!colnames(df_Mid_Troposphere) %in% c("Mo")],
+            df_Tropopause[!colnames(df_Tropopause) %in% c("Mo")], 
+            df_Lower_Stratosphere[!colnames(df_Lower_Stratosphere) %in% c("Mo")])
+  
+df <- df_list %>% reduce(full_join,by='Year')
+```
+
+Calculate the 12-month(right-aligned) moving average
+
+```{r}
+
+for(col_name in colnames(df[,c(-1,-2)])){
+  new_name = paste0(col_name,"_mov_av_right_align")
+  df<- transform(df, placeholder_name = round(rollmean(df[col_name], k=3, fill = "extend",align = "right"),4))
+  names(df)[names(df)==paste0(col_name,".1")]<-new_name
+}
+```
+
+Calculate the average of the "moving average"
+
+```{r}
+df <- df %>%
+  mutate(Avarage_moving_average = rowSums(df[7:10])/4)
+```
+
+Pivot to easier create graph
+
+```{r}
+df_pivot <- df %>% pivot_longer(!c(Year,Mo), names_to = "Type",values_to = "Temp")
+
+df_pivot[df_pivot == "Globe_Temp_Lower_Trop_mov_av_right_align"] <- "Lower Troposphere"
+df_pivot[df_pivot == "Globe_Temp_Mid_Trop_mov_av_right_align"] <- "Mid Troposphere"
+df_pivot[df_pivot == "Globe_Temp_Tropopause_mov_av_right_align"] <- "Tropopause"
+df_pivot[df_pivot == "Globe_Temp_Lower_Strato_mov_av_right_align"] <- "Lower Stratosphere"
+df_pivot[df_pivot == "Avarage_moving_average"] <- "Avarage"
+```
+
+Draw Graph
+
+```{r fig.asp = 0.6, fig.height=1, fig.width=8}
+type_filter = c("Lower Troposphere",
+                "Mid Troposphere",
+                "Tropopause",
+                "Lower Stratosphere",
+                "Avarage")
+
+plot_title = "Atmospheric Temperature"
+plot_subtitle ="12th month moving average (right-aligned)"
+plot_label_y = "Temprature"
+plot_label_x = "Year"
+plot_caption = "Source: https://www.drroyspencer.com/latest-global-temperatures (06/02/23)"
+plot_leg_title = "Area"
+
+suppressWarnings({
+df_pivot %>% 
+  filter(Type %in% type_filter) %>%
+  ggplot(aes(x=Year,
+             y=Temp,
+             color = Type))+
+  geom_line(size=0.8,linetype = "solid")+
+  scale_color_manual(values=hod_theme_colours)+
+  labs(title = plot_title,
+       subtitle = plot_subtitle,
+         y = plot_label_y,
+         x = plot_label_x,
+         caption = plot_caption)+
+ scale_x_continuous(n.breaks = 9)+
+  hod_theme(ledgend_pos="right", alter_x_axis_colour= TRUE)+
+  theme(legend.margin=margin(t = -2,r=-0.2, unit='cm'),
+        plot.caption = element_text(hjust=-120,vjust=-3))+
+  guides(colour=guide_legend(title = plot_leg_title))
+})
+```
