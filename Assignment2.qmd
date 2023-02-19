@@ -4,23 +4,185 @@ format: html
 editor: visual
 ---
 
-## Quarto
+## Assignment
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
+On the MOTOR website: <https://www.motor.no/aktuelt/motors-store-vintertest-av-rekkevidde-pa-elbiler/217132> 
 
-## Running Code
+We find a table showing the relationship between the mileage that an electric car is stated to have (WLTP figures) and actual mileage in the Motor\'s Range test (STOPP).  
 
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+**Task 1**
+
+Once the web page is loaded in a browser, you can look at the html code by right-clicking on the mouse. Select View Page Source. 
+
+Find the html \"tag\" of the table, and attach a package in R that reads html, e.g. **rvest**. Scrape the table from the website. \
+
+Note that in this table there is a lot of unnecessary \"clutter\" that needs to be cleaned up before one is left with the range figures. 
+
+Create a ggplot, where \"stop\" is on the y-axis, and \"wltp\" is on the x-axis. Add a 45-degree line showing how far the cars \"really\" should have driven (redline in my fig below). 
+
+![](https://lh3.googleusercontent.com/PkfsoKr524xH8fFOwuZmFsLH7rjgrRkgd5ApspU3-5bXuPXAdJu7NuLy9qPMdLOCNmDhiXv1aZdyK1VwcifELjZb9mPF3AwBs1D1A02zHz_zf-6PTtPoOKBJhWfQA3kY4GWat_8Q47Hz_JkjZGWUYFw){width="252"}
+
+Create an appropriate title and accompanying Character text that explains what is \"happening\" in the figure. 
+
+**Task 2**
+
+None of the car brands reach the red line (expected mileage). But there is a clear positive correlation between what is promised and actual mileage. Use R\'s [lm()function](https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/lm). Use \"stop\" as y variable and \"wltp\" as an x-variable, and specify the name of your data set. 
+
+*lm(\< Y variable name \> \~ \<X variable \>, data = \<dataset name\>)*
+
+After \"running\" the code, how do you interpret the two values on the customized line?\
+Add the custom line to ggplot using + geom_smooth(method = lm).
+
+**Setup**
 
 ```{r}
-1 + 1
+rm(list = ls())
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(rvest))
+suppressPackageStartupMessages(library(janitor))
+
+# A custome theme I use
+
+hod_theme_colours <- c("#ffa822","#1ac0c6","#ff6150","#30B66A","#B06AFF","#FF21E1")
+
+hod_theme <- function(alter_x_axis_colour = FALSE,
+                      ledgend_pos = "right") {
+  
+  colour_text <- "#b8aba7"
+  colour_text_light <- "#FFE9E3"
+  colour_box <- "#2b2b2b"
+  colour_lines <- "#827974"
+  colour_main <- "#E9D5DA"
+  colour_background <- "#2b2b2b"
+  colour_palette_standard <- c("#ffa822", "#ff6150","#1ac0c6")
+  colour_text_x_axis <- colour_text
+  
+  if(alter_x_axis_colour){
+     colour_text_x_axis <- c(colour_text,colour_text_light)
+  }
+    
+  theme(
+    # Border and margin
+    plot.margin = margin(0.4, 0.6, 0.4, 0.4, "cm"),
+    panel.border = element_rect(colour = colour_box, fill = NA, linetype = 2),
+    
+    # background
+    panel.background = element_rect(fill = colour_background),
+    plot.background = element_rect(fill = colour_background),
+    strip.background = element_rect(fill = colour_background),
+    
+    rect = element_rect(fill = colour_background, colour = "white",
+                        size = 0.5, linetype = 1),
+    
+    # grid
+    panel.grid.major.x = element_line(colour = colour_lines, linetype = 5, size = 0.25),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y =  element_line(colour = colour_lines, linetype = 5, size = 0.25),
+    panel.grid.minor.y = element_blank(),
+    axis.ticks = element_line(colour = colour_text),
+    
+    # line
+    line = element_line(colour = colour_palette_standard),
+    
+    # text
+    text = element_text(colour = colour_text, face = "italic", family = "mono"),
+    plot.title = element_text(colour = colour_text_light, face = "bold", family = "mono"),
+    plot.subtitle = element_text(colour = colour_text, family = "mono", hjust = 0.01),
+    plot.caption = element_text(colour = colour_text, face = "italic", family = "mono"),
+    axis.text.y = element_text(colour = colour_text, face = "italic", family = "mono"),
+    axis.text.x = element_text(colour = colour_text_x_axis, face = "italic", family = "mono"),
+    axis.title = element_text(colour = colour_text_light, family = "mono"),
+    plot.tag = element_text(colour = colour_text, face = "italic", family = "mono"),
+    legend.text = element_text(color = colour_text,face = "italic", family = "mono"),
+    legend.title = element_text(colour = colour_text, face = "italic", family = "mono"),
+    strip.text = element_text(colour = colour_text_light, face = "bold", family = "mono"),
+    
+    # legend
+    legend.position = ledgend_pos,
+    legend.key = element_rect(fill = colour_background)
+  )
+}
 ```
 
-You can add options to executable code like this
+**Request Data (HTTP)**
 
 ```{r}
-#| echo: false
-2 * 2
+URL = "https://www.motor.no/aktuelt/motors-store-vintertest-av-rekkevidde-pa-elbiler/217132"
+h_request <- read_html(URL) %>% html_element(css = "table") %>% 
+  html_table()
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+**Cleaning of data**
+
+```{r}
+df <- h_request %>% clean_names()
+names(df) <- df[1,]
+df <- df[-1,]
+df <- df %>%
+  select(c("Modell (temp. varierte fra 0° til -10°)","WLTP-tall","STOPP"))
+
+df$STOPP <- as.numeric(gsub("[^0-9]", "", df$STOPP))
+colnames(df)[1] <- "Modell"
+colnames(df)[3] <- "STOPP(KM)"
+
+df <- na.omit(df)
+
+
+df$distance_energy <- str_split(gsub("[^0-9]./", "", df$`WLTP-tall`),"/")
+df <- df %>%
+  separate(col = distance_energy, into = c("distance", "energy"), sep = " ")
+df$energy <- as.numeric(gsub(",", ".", df$energy))
+df$distance <- as.numeric(df$distance)
+
+#df$`km/kWh` = df$distance/df$energy
+
+#df <- df %>% 
+#  relocate(`km/kWh`, .before = `STOPP(KM)`)
+
+lm_model <- lm(`STOPP(KM)` ~ distance, data = df)
+
+#df$fit <- lm_model$fitted.values
+
+coef <-  lm_model$coefficients
+
+df <- df %>%
+  select(-c("energy","WLTP-tall"))
+
+```
+
+**PLOT**
+
+Note: I looked back at the example graph, and I realized I misunderstood as I calculated the km/kWh from the WLTP. But I saw you only used the distance from the WLTP, so I change it to that but I'll leave my old code in here as well.
+
+```{r fig.asp = 0.6, fig.height=1, fig.width=8}
+
+plot_title = "WLTP vs Stop"
+plot_subtitle ="comparison of electrical car models expected max distance vs actual distance"
+plot_label_x = "WLTP (distance)"
+plot_label_y = "STOP(KM)"
+plot_caption = paste("Source:",URL)
+
+suppressWarnings({
+df %>% 
+  ggplot(aes(x=distance,
+             y=`STOPP(KM)`,
+             color = Modell))+
+  geom_abline(intercept = 0,slope = 1, color = "red")+
+  geom_abline(intercept = coef[1],slope = coef[2], color = "white")+
+  geom_smooth(method = "lm", color = "white", formula =  y ~ poly(x, 4)) +
+  geom_point(size=2)+
+  labs(title = plot_title,
+       subtitle = plot_subtitle,
+         y = plot_label_y,
+         x = plot_label_x,
+         caption = plot_caption)+
+  scale_x_continuous(limits = c(200,600), n.breaks = 10)+
+  scale_y_continuous(limits = c(200,600),n.breaks = 10)+
+  hod_theme()+
+    theme(plot.caption = element_text(hjust=-2.5))
+})
+```
+
+This graph shows expected stop distance vs actual stop distance between different electrical car models
+
+We can see that most models preformed better than expected.
