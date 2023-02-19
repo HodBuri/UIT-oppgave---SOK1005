@@ -1,0 +1,140 @@
+---
+title: "Task 2 sok1005"
+format: html
+editor: visual
+---
+
+## Task
+
+1.  Use R code to download from [FRED](https://fred.stlouisfed.org/series/DCOILBRENTEU) the daily Brent Crude Oil Price from January 4th 2010 to December 30, 2022.
+
+2.  Perform some data wrangling and convert the daily price to monthly price.
+
+3.  Plot the monthly price against the date
+
+**Setup**
+
+```{r}
+rm(list = ls())
+suppressPackageStartupMessages(library(tidyverse))
+suppressPackageStartupMessages(library(fredr))
+
+
+# A custome theme I use
+
+hod_theme_colours <- c("#ffa822","#1ac0c6","#ff6150","#30B66A","#B06AFF","#FF21E1")
+
+hod_theme <- function(alter_x_axis_colour = FALSE,
+                      ledgend_pos = "right") {
+  
+  colour_text <- "#b8aba7"
+  colour_text_light <- "#FFE9E3"
+  colour_box <- "#2b2b2b"
+  colour_lines <- "#827974"
+  colour_main <- "#E9D5DA"
+  colour_background <- "#2b2b2b"
+  colour_palette_standard <- c("#ffa822", "#ff6150","#1ac0c6")
+  colour_text_x_axis <- colour_text
+  
+  if(alter_x_axis_colour){
+     colour_text_x_axis <- c(colour_text,colour_text_light)
+  }
+    
+  theme(
+    # Border and margin
+    plot.margin = margin(0.4, 0.6, 0.4, 0.4, "cm"),
+    panel.border = element_rect(colour = colour_box, fill = NA, linetype = 2),
+    
+    # background
+    panel.background = element_rect(fill = colour_background),
+    plot.background = element_rect(fill = colour_background),
+    strip.background = element_rect(fill = colour_background),
+    
+    rect = element_rect(fill = colour_background, colour = "white",
+                        size = 0.5, linetype = 1),
+    
+    # grid
+    panel.grid.major.x = element_line(colour = colour_lines, linetype = 5, size = 0.25),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y =  element_line(colour = colour_lines, linetype = 5, size = 0.25),
+    panel.grid.minor.y = element_blank(),
+    axis.ticks = element_line(colour = colour_text),
+    
+    # line
+    line = element_line(colour = colour_palette_standard),
+    
+    # text
+    text = element_text(colour = colour_text, face = "italic", family = "mono"),
+    plot.title = element_text(colour = colour_text_light, face = "bold", family = "mono"),
+    plot.subtitle = element_text(colour = colour_text, family = "mono", hjust = 0.01),
+    plot.caption = element_text(colour = colour_text, face = "italic", family = "mono"),
+    axis.text.y = element_text(colour = colour_text, face = "italic", family = "mono"),
+    axis.text.x = element_text(colour = colour_text_x_axis, face = "italic", family = "mono"),
+    axis.title = element_text(colour = colour_text_light, family = "mono"),
+    plot.tag = element_text(colour = colour_text, face = "italic", family = "mono"),
+    legend.text = element_text(color = colour_text,face = "italic", family = "mono"),
+    legend.title = element_text(colour = colour_text, face = "italic", family = "mono"),
+    strip.text = element_text(colour = colour_text_light, face = "bold", family = "mono"),
+    
+    # legend
+    legend.position = ledgend_pos,
+    legend.key = element_rect(fill = colour_background)
+  )
+}
+```
+
+**Importing and cleaning of data**
+
+### IMPORTANT: As the website FRED specified I removed my API key, and you have to put in your own to make the code work.
+
+follow this link for more info: https://fred.stlouisfed.org/docs/api/api_key.html
+
+```{r}
+api_key = "" #IMPORTANT: API KEY FORM FRED
+fredr_set_key(api_key)
+
+if (fredr_has_key()) {
+  df_raw <- fredr(
+    series_id = "DCOILBRENTEU",
+    observation_start = as.Date("2010-01-04"),
+    observation_end = as.Date("2022-12-30"),
+    frequency = "m",
+    aggregation_method = "avg")
+}
+```
+
+```{r}
+df = df_raw %>%
+  select(-c("realtime_start","realtime_end","series_id"))
+
+df <- na.omit(df)
+```
+
+```{r}
+df_month <- df %>% 
+  mutate(date = as.Date(date, format = "%Y/%d/%m"))
+```
+
+**Plot**
+
+```{r fig.asp = 0.6, fig.height=1, fig.width=8}
+
+plot_title = "Crude Oil Prices"
+plot_subtitle ="Average per month (2010-2022)"
+plot_label_y = "Price"
+plot_label_x = "Year"
+plot_caption = "Source: https://fred.stlouisfed.org/series/DCOILBRENTEU (accessed: 19/02/23)"
+
+suppressWarnings({
+df_month %>% 
+  ggplot(aes(x=date,
+             y=value))+
+  geom_line(size=0.8,linetype = "solid", color = hod_theme_colours[1])+
+  labs(title = plot_title,
+       subtitle = plot_subtitle,
+         y = plot_label_y,
+         x = plot_label_x,
+         caption = plot_caption)+
+  hod_theme()
+})
+```
