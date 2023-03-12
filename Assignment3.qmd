@@ -1,0 +1,138 @@
+---
+title: "Assignment3"
+format: html
+editor: visual
+---
+
+## Assignment 3: Reading json data from a web page
+
+On the website of the New York Times: https://www.nytimes.com/interactive/2021/12/28/us/covid-deaths.html?referrer=masthead
+
+We find a figure showing the relationship between vaccination rates and the number of deaths from COVID-19 in the various states in the US.
+
+#### Setup
+
+```{r,message=FALSE, warning=FALSE}
+rm(list = ls())
+library(tidyverse)
+library(jsonlite)
+library(plotly)
+
+
+hod_theme_colours <- c("#ffa822","#1ac0c6","#ff6150","#30B66A","#B06AFF","#FF21E1")
+```
+
+Note: I did this assignment with Plotly, as I wanted to test something else than ggplot.
+
+more info at the bottom.
+
+### Task 1
+
+To access the website you need to register with the NYT, this is free.
+
+Once the web page is loaded in a browser, you can look at the html code by right-clicking on the mouse. Select View Page Source.
+
+Find the JSON link with the JSON data from which the figure reads the data.
+
+Use a package in R that reads JSON ( for instance, jsonlite or rjstat), and download the data from the link.
+
+Then create a ggplot that replicates the figure above.
+
+```{r}
+URL = "https://static01.nyt.com/newsgraphics/2021/12/20/us-coronavirus-deaths-2021/ff0adde21623e111d8ce103fedecf7ffc7906264/scatter.json"
+
+df_raw = fromJSON(URL)
+#names(df_raw)
+```
+
+```{r}
+df <- df_raw %>%
+  mutate(abb = abbreviate(name, 2)) %>%
+  mutate(fully_vaccinated_pct_of_pop_percent = fully_vaccinated_pct_of_pop*100) %>%
+  relocate(abb, .after = name)
+```
+
+```{r}
+
+fig <- df %>%
+  plot_ly(
+    x = ~fully_vaccinated_pct_of_pop_percent,
+    y = ~deaths_per_100k,
+    type = "scatter",
+    mode = "markers",
+    text = ~abb,
+    hovertext = ~paste(name, '<br><br> Avg. monthly deaths per<br>100.000 since universal<br> vaccine eligibility', round(deaths_per_100k,2)),
+    hoverinfo = 'text') %>% 
+  add_markers() %>%
+  add_text(textposition = "top right") %>%
+  layout(
+    title = "Covid-19 deaths VS vaccination rates",
+    yaxis = list(
+      title = "avg.monthly deaths per 100.000",
+      range = c(0,20)
+    ),
+    xaxis = list(
+      title = "Share of total population fully vaccinated",
+      range = c(45,80)
+      ),
+    showlegend = FALSE,
+    margin = list(l = 50, r = 0, b = 120, t = 50),
+    annotations = list(
+      x = 1, 
+      y = -0.3, 
+      text = "Source: <a href=”https://www.nytimes.com/interactive/2021/12/28/us/covid-deaths.html?referrer=masthead”>https://www.nytimes.com/interactive/2021/12/28/us/covid-deaths.html?referrer=masthead</a><br>Notes: Chart shows deaths reported since universal vaccine eligibility on April 19, 2021.<br>Vaccination rate is the percentage of the total population fully vaccinated as of Dec. 20, 2021.",
+      xref='paper', yref='paper', showarrow = F, 
+      xanchor='right', yanchor='left', xshift=0, yshift=0,
+      font = list(size = 8))
+  )
+
+fig
+```
+
+### Task 2
+
+There is a clear negative correlation between the number of deaths per 100 000 (y-axis) and the proportion of the population vaccinated (x-axis).
+
+Use R's lm() function. Set the variable on the y-axis and x-axis, and specify the data set.
+
+LM(\<Y variable name\> \~ \<X variable\>, data=\<dataset name\>)
+
+After "running" the code, how do you interpret the two values on the customized line?
+
+Add the custom line to ggplot using + geom_smooth(method = lm).
+
+```{r}
+
+#lm_model <- lm(deaths_per_100k ~ fully_vaccinated_pct_of_pop_percent, data = df)
+
+y <- df$deaths_per_100k
+X <- df$fully_vaccinated_pct_of_pop_percent
+
+lm_model <- lm(deaths_per_100k ~ fully_vaccinated_pct_of_pop_percent, data = df) 
+
+x_range <- seq(min(X), max(X), length.out = 51)
+x_range <- matrix(x_range, nrow=51, ncol=1)
+xdf <- data.frame(x_range)
+colnames(xdf) <- 'fully_vaccinated_pct_of_pop_percent'
+
+ydf <- lm_model %>% predict(xdf) 
+xy <- data.frame(xdf, ydf) 
+colnames(xdf)[colnames(xdf) == "ydf"] <- 'deaths_per_100k'
+
+fig2 <- fig %>% add_trace(data = df, 
+            x = ~xy$fully_vaccinated_pct_of_pop_percent,
+            y = ~xy$ydf, 
+            mode = "lines",
+            text = "",
+            hovertext = "")
+
+fig2
+```
+
+I am a bit unsure what 'After "running" the code, how do you interpret the two values on the customized line?' means, since I used Plotly (just to test it out) it might be something i cant see. So ill just give some general information about how I read the plot and how lm works.
+
+LM is a linear model, specifically a linear regression model. The idea of how It works is by finding a path that splits all the points into two sides where the total distance from the line on each side is close to equal. One can add multiple linear models on top of each other to get a more complex/deeper model.
+
+The graph is a bit simpler, it shows a trend of descent in avarage deaths per 100 000 as the vaccinated part of the population increases.
+
+Send me a message, or something if its a problem that I tested Plotly, But I saw that the example graph was interactive and i wanted to try out something new.
