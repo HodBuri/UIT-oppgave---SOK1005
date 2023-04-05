@@ -190,7 +190,7 @@ After "running" the code, how do you interpret the estimated coefficients?
 
 ```{r}
 # Set your own API key for FRED, as stated by them
-fredr_set_key("634c8e5edaf14b0444592772859aca19") # NEEDED !!!!!!!!!!!!!!
+fredr_set_key("FRED_KEY") # NEEDED !!!!!!!!!!!!!!
 
 start_date <- as.Date("2010-01-04")
 end_date <- as.Date("2022-12-31")
@@ -250,3 +250,7 @@ merged_data <- merge(exxon, oil, by = "Date", suffixes = c("_exxon", "_oil"))
 model <- lm(Monthly_Avg_Price_exxon ~ Monthly_Avg_Price_oil, data = merged_data)
 summary(model)
 ```
+
+The coefficients (Intercept) shows that if oil price = 0, Exxon stock price = 48.13
+
+The coefficients (Monthly_Avg_Price_oil) shows that if oil price increase by 1, Exxon stock price increase by 0.12
