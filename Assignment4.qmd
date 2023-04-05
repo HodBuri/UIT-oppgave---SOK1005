@@ -1,0 +1,252 @@
+---
+title: "Assignment4"
+format: html
+editor: visual
+---
+
+## Assignment 4
+
+### Setup
+
+```{r,message=FALSE, warning=FALSE}
+rm(list = ls())
+library(tidyverse)
+library(dplyr)
+library(ggplot2)
+library(lubridate)
+library(quantmod)
+library(fredr)
+
+hod_theme_colours <- c("#ffa822","#1ac0c6","#ff6150","#30B66A","#B06AFF","#FF21E1")
+
+hod_theme <- function(alter_x_axis_colour = FALSE,
+                      ledgend_pos = "right") {
+  
+  colour_text <- "#b8aba7"
+  colour_text_light <- "#FFE9E3"
+  colour_box <- "#2b2b2b"
+  colour_lines <- "#827974"
+  colour_main <- "#E9D5DA"
+  colour_background <- "#2b2b2b"
+  colour_palette_standard <- hod_theme_colours
+  colour_text_x_axis <- colour_text
+  
+  if(alter_x_axis_colour){
+     colour_text_x_axis <- c(colour_text,colour_text_light)
+  }
+    
+  theme(
+    # Border and margin
+    plot.margin = margin(0.4, 0.6, 0.4, 0.4, "cm"),
+    panel.border = element_rect(colour = colour_box, fill = NA, linetype = 2),
+    
+    # background
+    panel.background = element_rect(fill = colour_background),
+    plot.background = element_rect(fill = colour_background),
+    strip.background = element_rect(fill = colour_background),
+    
+    rect = element_rect(fill = colour_background, colour = "white",
+                        size = 0.5, linetype = 1),
+    
+    # grid
+    panel.grid.major.x = element_line(colour = colour_lines, linetype = 5, size = 0.25),
+    panel.grid.minor.x = element_blank(),
+    panel.grid.major.y =  element_line(colour = colour_lines, linetype = 5, size = 0.25),
+    panel.grid.minor.y = element_blank(),
+    axis.ticks = element_line(colour = colour_text),
+    
+    # line
+    line = element_line(colour = colour_palette_standard),
+    
+    # text
+    text = element_text(colour = colour_text, face = "italic", family = "mono"),
+    plot.title = element_text(colour = colour_text_light, face = "bold", family = "mono"),
+    plot.subtitle = element_text(colour = colour_text, family = "mono", hjust = 0.01),
+    plot.caption = element_text(colour = colour_text, face = "italic", family = "mono"),
+    axis.text.y = element_text(colour = colour_text, face = "italic", family = "mono"),
+    axis.text.x = element_text(colour = colour_text_x_axis, face = "italic", family = "mono"),
+    axis.title = element_text(colour = colour_text_light, family = "mono"),
+    plot.tag = element_text(colour = colour_text, face = "italic", family = "mono"),
+    legend.text = element_text(color = colour_text,face = "italic", family = "mono"),
+    legend.title = element_text(colour = colour_text, face = "italic", family = "mono"),
+    strip.text = element_text(colour = colour_text_light, face = "bold", family = "mono"),
+    
+    # legend
+    legend.position = ledgend_pos,
+    legend.key = element_rect(fill = colour_background)
+  )
+}
+```
+
+### Task 1
+
+You will find the data for these tasks at the following url:
+
+[**https://raw.githubusercontent.com/uit-sok-1005-v23/uit-sok-1005-v23.github.io/main/storedata.csv**](https://raw.githubusercontent.com/uit-sok-1005-v23/uit-sok-1005-v23.github.io/main/storedata.csv).
+
+The data file contains 7185 observations and 9 variables.
+
+1: For the last 3 months of 2017, calculate the total Sales by month, for Region 1 and Region 9 in the Customer_Segment, Corporate, and Consumer. This output is Table 1.
+
+2: Make a plot of the monthly total Sales in Region 1 and Region 13 in 2015, 2016, and 2017. This output is Figure 1.
+
+3: In Figure 1, identify the months where the total Sales in Region 13 is greater than the total Sales in Region 1. This output is Table 2.
+
+4: Find the average Profit per Customer_Segment and Product_Category in 2017, for all regions except Region 3, 5 and 8. What segment produced the highest average profit? This output is Table 3.
+
+```{r}
+data_store_raw <- read.csv("https://raw.githubusercontent.com/uit-sok-1005-v23/uit-sok-1005-v23.github.io/main/storedata.csv")
+
+data_store_raw$Order_Date <- as.Date(data_store_raw$Order_Date)
+```
+
+```{r}
+data_store_y17_r1_r9 <- data_store_raw %>%
+  filter(Region %in% c("Region 1", "Region 9"),
+         Customer_Segment %in% c("Corporate", "Consumer"),
+         year(Order_Date) == 2017,
+         month(Order_Date) %in% 10:12) %>%
+  mutate(Month = month(Order_Date)) %>%
+  group_by(Region, Customer_Segment, Month) %>%
+  summarise(Total_Sales = sum(Sales))
+
+print(data_store_y17_r1_r9)
+```
+
+```{r}
+data_store_y15_17_r1_r13 <- data_store_raw %>%
+  filter(Region %in% c("Region 1", "Region 13"),
+         year(Order_Date) %in% 2015:2017) %>%
+  mutate(Year = year(Order_Date),
+         Month = month(Order_Date)) %>%
+  group_by(Region, Year, Month) %>%
+  summarise(Total_Sales = sum(Sales))
+
+data_store_y15_17_r1_r13$Month <- factor(data_store_y15_17_r1_r13$Month, levels = 1:12, labels = month.abb)
+```
+
+```{r}
+data_store_y15_17_r1_r13 %>%
+  ggplot(aes(
+    x = Month, 
+    y = Total_Sales, 
+    fill = factor(Year), 
+    group = interaction(Year, Region))) +
+  geom_col(position = "stack") +
+  facet_grid(Year ~ Region) +
+  labs(title = "Monthly Total Sales in Region 1 and Region 13",
+       x = "Month",
+       y = "Total Sales",
+       fill = "Year") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  hod_theme()
+```
+
+```{r}
+data_store_r13_total_sales <- data_store_y15_17_r1_r13 %>%
+  spread(Region, Total_Sales) %>%
+  filter(`Region 13` > `Region 1`)
+
+print(data_store_r13_total_sales)
+```
+
+```{r}
+data_store_y17_avrage_profit <- data_store_raw %>%
+  filter(!Region %in% c("Region 3", "Region 5", "Region 8"),
+         year(Order_Date) == 2017) %>%
+  group_by(Customer_Segment, Product_Category) %>%
+  summarise(Average_Profit = mean(Profit))
+
+print(data_store_y17_avrage_profit)
+```
+
+```{r}
+data_store_y17_avrage_profit %>%
+  ggplot(aes(x = Customer_Segment, y = Average_Profit, fill = Product_Category)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(title = "Profit per Customer Segment and Product Category",
+       x = "Customer_Segment",
+       y = "Average_Profit") +
+  hod_theme()
+```
+
+### Task 2
+
+In this task, feel free to use any API or package/library that downloads the data to your session. Use code and download daily stock prices for Exxon Mobil Corporation (XOM), traded at NYSE. The Yahoo! Finance site is a convenient place to find [the data](https://finance.yahoo.com/quote/XOM?p=XOM&.tsrc=fin-srch) . Use the Adjusted closing price from January 4th 2010 as the starting date. And calculate the monthly average using trading volume as a weight, and save this variable as  "exxon". 
+
+Use code to download the daily Brent Crude Oil Price from [FRED](https://fred.stlouisfed.org/series/DCOILBRENTEU)  from January 4th 2010 as the starting date. And calculate the monthly arithmetic average. Save the monthly arithmetic average values as  "oil". 
+
+In both variables, take December 2022, or 2022:12 for shorthand as a last data point. 
+
+Plot both variables, i.e., exxon and oil " in the same plot window. Here, the x-axis should be the  "date" variable.  Comment on the plots. 
+
+Now take "exxon" as a y-variable and "oil" as an x-variable. 
+
+Use R's  [lm() function](https://www.rdocumentation.org/packages/stats/versions/3.6.2/topics/lm). Set the variable on the y-axis and x-axis, and specify the data set. 
+
+LM(\<Y variable name\> \~ \<X variable\>, data=\<dataset name\>)
+
+After "running" the code, how do you interpret the estimated coefficients?
+
+```{r}
+# Set your own API key for FRED, as stated by them
+fredr_set_key("634c8e5edaf14b0444592772859aca19") # NEEDED !!!!!!!!!!!!!!
+
+start_date <- as.Date("2010-01-04")
+end_date <- as.Date("2022-12-31")
+exxon_raw <- getSymbols("XOM", src = "yahoo", from = start_date, to = end_date, auto.assign = FALSE)
+exxon_raw <- data.frame(Date = index(exxon_raw), coredata(exxon_raw))
+```
+
+```{r}
+exxon <- exxon_raw %>%
+  mutate(Year = format(Date, "%Y"),
+         Month = format(Date, "%m"),
+         Weighted_Price = `XOM.Adjusted` * XOM.Volume) %>%
+  group_by(Year, Month) %>%
+  summarise(Monthly_Avg_Price = sum(Weighted_Price) / sum(XOM.Volume)) %>%
+  mutate(Date = as.Date(paste(Year, Month, "01", sep = "-")))
+
+exxon$Month <- as.numeric(format(exxon$Date, "%m"))
+exxon$Month <- factor(exxon$Month, levels = 1:12, labels = month.abb)
+```
+
+```{r}
+if (fredr_has_key()) {
+  oil_raw <- fredr(
+    series_id = "DCOILBRENTEU",
+    observation_start = start_date,
+    observation_end = end_date)
+}
+```
+
+```{r}
+oil <- oil_raw %>%
+  mutate(Year = format(date, "%Y"),
+         Month = format(date, "%m")) %>%
+  group_by(Year, Month) %>%
+  summarise(Monthly_Avg_Price = mean(value, na.rm = TRUE)) %>%
+  mutate(Date = as.Date(paste(Year, Month, "01", sep = "-")))
+
+oil$Month <- as.numeric(format(oil$Date, "%m"))
+oil$Month <- factor(oil$Month, levels = 1:12, labels = month.abb)
+```
+
+```{r}
+ggplot() +
+  geom_line(data = exxon, aes(x = Date, y = Monthly_Avg_Price, color = "Exxon")) +
+  geom_line(data = oil, aes(x = Date, y = Monthly_Avg_Price, color = "Oil")) +
+  labs(title = "Exxon vs Oil",
+       x = "Year",
+       y = "Price",
+       color = "Variable")+
+  scale_x_date(date_breaks = "1 year", date_labels = "%Y") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  hod_theme()
+```
+
+```{r}
+merged_data <- merge(exxon, oil, by = "Date", suffixes = c("_exxon", "_oil"))
+model <- lm(Monthly_Avg_Price_exxon ~ Monthly_Avg_Price_oil, data = merged_data)
+summary(model)
+```
